@@ -9,7 +9,14 @@ grounding:
   icon_instruction: "Notepad desktop icon"
   min_bbox_area_px: 400
   max_bbox_area_px: 20000
-  require_planner_verdict: true
+  require_planner_verdict: false
+
+gemini:
+  model: "gemini-2.0-flash"
+  api_key_env: "GEMINI_API_KEY"
+  temperature: 0.1
+  max_output_tokens: 512
+  min_confidence: 0.5
 
 screenseeker:
   max_depth: 3

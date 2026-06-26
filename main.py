@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI entry point for ScreenSeekeR Notepad automation."""
+"""CLI entry point for Gemini-based Notepad GUI automation."""
 
 from __future__ import annotations
 
@@ -11,11 +11,12 @@ from pathlib import Path
 from core.config import load_config
 from core.logger import setup_logger
 from core.pipeline import NotepadPipeline
+from vision.gemini_grounding import create_grounding_service
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="ScreenSeekeR-based Windows GUI grounding automation"
+        description="Gemini-based Windows GUI grounding automation"
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -24,12 +25,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--profile",
         choices=["high", "low"],
         default="high",
-        help="Hardware profile (default: high)",
+        help="Gemini model profile (default: high)",
     )
     run_parser.add_argument(
         "--mock",
         action="store_true",
-        help="Use mock models (no GPU, for structure testing)",
+        help="Use mock grounding (no API key, for structure testing)",
     )
 
     annotate_parser = sub.add_parser(
@@ -41,10 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["high", "low"],
         default="high",
     )
-    annotate_parser.add_argument(
-        "--mock",
-        action="store_true",
-    )
+    annotate_parser.add_argument("--mock", action="store_true")
 
     demo_parser = sub.add_parser("demo", help="Run grounding once and print bbox")
     demo_parser.add_argument(
@@ -58,12 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     demo_parser.add_argument("--mock", action="store_true")
 
-    setup_parser = sub.add_parser("setup", help="Prepare desktop and output folder")
-    setup_parser.add_argument(
-        "--profile",
-        choices=["high", "low"],
-        default="high",
-    )
+    sub.add_parser("setup", help="Prepare desktop and output folder")
 
     return parser
 
@@ -71,7 +64,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    config = load_config(profile=args.profile)
+    profile = getattr(args, "profile", "high")
+    config = load_config(profile=profile)
 
     logger = setup_logger(level=config.logging.level, log_file=config.logging.log_file)
     logger.info("Profile: %s | Command: %s", config.profile, args.command)
@@ -89,22 +83,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "demo":
         from automation.windows import WindowsCapture
-        from vision.grounding import GroundingService, OSAtlasGrounder, MockGrounder
-        from vision.planner import MockPlanner, QwenPlanner
-        from vision.screenseeker import ScreenSeekeR
 
         capture = WindowsCapture(config)
         screenshot = capture.capture_screenshot()
-
-        if args.mock:
-            grounder = MockGrounder()
-            planner = MockPlanner()
-        else:
-            grounder = OSAtlasGrounder(config)
-            planner = QwenPlanner(config)
-
-        seeker = ScreenSeekeR(config, grounder, planner)
-        service = GroundingService(grounder, config, screenseeker=seeker)
+        service = create_grounding_service(config, use_mock=args.mock)
         result = service.locate(args.instruction, screenshot)
 
         logger.info("Bbox: %s", result.bbox.as_tuple())

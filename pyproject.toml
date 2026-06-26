@@ -1,7 +1,7 @@
 [project]
 name = "ai-notepad-automation"
 version = "0.1.0"
-description = "ScreenSeekeR-based Windows GUI grounding automation for Notepad workflow"
+description = "Gemini-based Windows GUI grounding automation for Notepad workflow"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -14,6 +14,7 @@ dependencies = [
     "pynput>=1.7",
     "pywinauto>=0.6.8",
     "pygetwindow>=0.0.9",
+    "google-genai>=1.0",
 ]
 
 [project.optional-dependencies]

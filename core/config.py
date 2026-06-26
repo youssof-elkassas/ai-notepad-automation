@@ -73,6 +73,14 @@ class AutomationConfig(BaseModel):
     typing_interval_seconds: float = 0.02
 
 
+class GeminiConfig(BaseModel):
+    model: str = "gemini-2.0-flash"
+    api_key_env: str = "GEMINI_API_KEY"
+    temperature: float = 0.1
+    max_output_tokens: int = 512
+    min_confidence: float = 0.5
+
+
 class ModelsConfig(BaseModel):
     grounder_id: str = "OS-Copilot/OS-Atlas-Base-7B"
     planner_id: str = "Qwen/Qwen2.5-VL-7B-Instruct"
@@ -93,6 +101,7 @@ class AppConfig(BaseSettings):
     api: ApiConfig = Field(default_factory=ApiConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     automation: AutomationConfig = Field(default_factory=AutomationConfig)
+    gemini: GeminiConfig = Field(default_factory=GeminiConfig)
     models: ModelsConfig = Field(default_factory=ModelsConfig)
 
     model_config = {"extra": "ignore"}

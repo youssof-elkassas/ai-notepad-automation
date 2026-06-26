@@ -12,24 +12,18 @@ from automation.keyboard import KeyboardController
 from automation.mouse import MouseController
 from automation.windows import WindowsCapture
 from core.config import AppConfig
-from core.exceptions import (
-    AutomationError,
-    GroundingError,
-    LowConfidenceError,
-    VerificationError,
-)
+from core.exceptions import GroundingError, LowConfidenceError, VerificationError
 from core.logger import save_failure_screenshot
 from core.retry import retry_with_backoff
-from vision.grounding import GroundingService, GroundingResult, OSAtlasGrounder, MockGrounder
+from vision.gemini_grounding import create_grounding_service
+from vision.grounding import GroundingResult
 from vision.gui_parser import GuiParser
-from vision.planner import MockPlanner, QwenPlanner
-from vision.screenseeker import ScreenSeekeR
 
 logger = logging.getLogger(__name__)
 
 
 class NotepadPipeline:
-    """Full automation pipeline with per-iteration re-grounding."""
+    """Full automation pipeline with per-iteration re-grounding via Gemini."""
 
     def __init__(
         self,
@@ -42,16 +36,7 @@ class NotepadPipeline:
         self.mouse = MouseController(config)
         self.keyboard = KeyboardController(config)
         self._parser = GuiParser(config.screen.width, config.screen.height)
-
-        if use_mock:
-            grounder = MockGrounder()
-            planner = MockPlanner()
-        else:
-            grounder = OSAtlasGrounder(config)
-            planner = QwenPlanner(config)
-
-        screenseeker = ScreenSeekeR(config, grounder, planner)
-        self.grounding = GroundingService(grounder, config, screenseeker=screenseeker)
+        self.grounding = create_grounding_service(config, use_mock=use_mock)
 
     def run(self, posts: list[Post] | None = None) -> None:
         """Execute the full Notepad workflow for all posts."""
@@ -87,7 +72,7 @@ class NotepadPipeline:
         logger.info("Post %d saved to %s", post.id, outfile)
 
     def _ground_notepad_icon(self) -> GroundingResult:
-        """Observe + Reason: fresh screenshot and ScreenSeekeR grounding."""
+        """Observe + Reason: fresh screenshot and Gemini grounding."""
 
         def _attempt() -> GroundingResult:
             screenshot = self.capture.capture_screenshot()

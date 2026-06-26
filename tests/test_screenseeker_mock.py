@@ -34,6 +34,7 @@ def test_screenseeker_mock_search(config, screenshot):
 
 
 def test_screenseeker_rejects_low_verdict(config, screenshot):
+    config.grounding.require_planner_verdict = True
     bbox = Bbox(0.1, 0.1, 0.15, 0.18)
     grounder = MockGrounder(bbox=bbox)
     planner = MockPlanner(

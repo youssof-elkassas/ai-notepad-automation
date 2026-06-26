@@ -1,18 +1,15 @@
 # ScreenSeekeR Notepad Automation
 
-Windows desktop automation using the **ScreenSeekeR** agentic visual grounding pipeline from [ScreenSpot-Pro (arXiv:2504.07981)](https://arxiv.org/pdf/2504.07981). Locates GUI elements via natural language — no hardcoded coordinates, template matching, or OCR-only detection.
+Windows desktop automation using **Google Gemini** for visual grounding — locate GUI elements from natural language without hardcoded coordinates, template matching, or local GPU model downloads.
 
 ## Architecture
 
 ```mermaid
 flowchart TD
     SS[Screenshot] --> PP[GUI Preprocess]
-    PP --> PI[Planner Position Inference]
-    PI --> GR[OS-Atlas Grounding]
-    GR --> SC[Score NMS Dilate]
-    SC --> RS[Recursive Crop Search]
-    RS --> RC[Planner Result Check]
-    RC --> MO[Mouse Action]
+    PP --> GM[Gemini API Grounding]
+    GM --> BB[Bounding Box]
+    BB --> MO[Mouse Action]
     MO --> KV[Keyboard Action]
     KV --> WV[State Verify]
     WV --> SS
@@ -23,115 +20,101 @@ flowchart TD
 - Windows 10/11, 1920×1080 (100% scaling recommended)
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/) package manager
-- NVIDIA GPU recommended (8 GB+ VRAM for low profile, 16 GB+ for high)
+- **Gemini API key** ([get one free](https://aistudio.google.com/apikey))
+- Internet connection (API calls — no local model download)
 
 ## Installation
 
-```bash
-# Clone and enter project
+```powershell
 cd ai-notepad-automation
 
-# Install uv (if needed)
-# curl -LsSf https://astral.sh/uv/install.sh | sh
+# Install uv (PowerShell)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 
-# Install dependencies + vision extras
-uv sync --extra vision --extra dev
+# Install dependencies
+uv sync --extra dev
+
+# Set your API key
+set GEMINI_API_KEY=your_key_here
 ```
 
-Models download automatically from HuggingFace on first run:
-- **High profile:** `OS-Copilot/OS-Atlas-Base-7B` + `Qwen/Qwen2.5-VL-7B-Instruct`
-- **Low profile:** `OS-Copilot/OS-Atlas-Base-4B` + `Qwen/Qwen2.5-VL-3B-Instruct` (4-bit)
-
-Set cache directory (optional):
-```bash
-set HF_HOME=models
-```
+Or copy `.env.example` to `.env` and fill in your key (load manually or use `set` in the shell).
 
 ## Usage
 
 ### Setup desktop
 
-```bash
+```powershell
 uv run python main.py setup
 ```
 
-Creates `Desktop/tjm-project/` and ensures a Notepad shortcut exists.
+### Demo grounding (single screenshot — best first test)
+
+```powershell
+set GEMINI_API_KEY=your_key_here
+uv run python main.py demo --profile high
+```
 
 ### Run full pipeline (10 posts)
 
-```bash
+```powershell
 uv run python main.py run --profile high
-# or for lower-spec machines:
-uv run python main.py run --profile low
 ```
 
-Each iteration:
-1. Fresh screenshot
-2. ScreenSeekeR grounds the Notepad desktop icon
-3. Double-clicks, types post, saves to `Desktop/tjm-project/post_{id}.txt`
-4. Closes Notepad and repeats
+Each iteration: fresh screenshot → Gemini finds Notepad icon → double-click → type → save to `Desktop\tjm-project\post_{id}.txt` → close → repeat.
 
-### Demo grounding (single shot)
+### Annotated screenshots
 
-```bash
-uv run python main.py demo --instruction "Notepad desktop icon"
-```
-
-### Generate annotated screenshots
-
-Arrange the Notepad icon at three positions (top-left, center, bottom-right), then:
-
-```bash
+```powershell
 uv run python main.py annotate --profile high
 ```
 
-Output: `screenshots/annotated/notepad_{position}.png`
+### Mock mode (no API key)
 
-### Mock mode (no GPU)
-
-```bash
+```powershell
+uv run python main.py demo --mock
 uv run python main.py run --mock
-uv run python main.py annotate --mock
 ```
 
-## Folder Structure
+## Profiles
 
-```
-├── main.py                 # CLI entry
-├── config/                 # YAML configuration + profiles
-├── vision/                 # ScreenSeekeR, OS-Atlas, planner, GUI parser
-├── automation/             # Mouse, keyboard, Windows capture
-├── api/                    # JSONPlaceholder client
-├── core/                   # Pipeline, config, retry, logging
-├── scripts/                # Desktop setup, annotated screenshot generator
-├── models/                 # HuggingFace cache (runtime)
-├── screenshots/            # Logs, failures, annotated output
-├── tests/                  # Unit tests
-└── docs/                   # Design doc, interview prep
-```
+| Profile | Gemini model | Use case |
+|---------|--------------|----------|
+| `high` | `gemini-2.0-flash` | Best accuracy (default) |
+| `low` | `gemini-2.0-flash-lite` | Faster / cheaper |
+
+Configure in `config/profile_high.yaml` and `config/profile_low.yaml`.
 
 ## Configuration
 
 | File | Purpose |
 |------|---------|
-| `config/default.yaml` | Shared defaults |
-| `config/profile_high.yaml` | 7B models, full ScreenSeekeR |
-| `config/profile_low.yaml` | 4B/3B INT4, ReGround fallback |
+| `config/default.yaml` | Shared settings, Gemini defaults |
+| `config/profile_high.yaml` | Flash model |
+| `config/profile_low.yaml` | Flash-Lite model |
 
-Key settings: `grounding.icon_instruction`, confidence thresholds, retry counts, timeouts.
+Key settings:
+- `grounding.icon_instruction` — what to find on screen
+- `gemini.min_confidence` — reject low-confidence detections
+- `gemini.api_key_env` — env var name for API key (default: `GEMINI_API_KEY`)
 
-## Known Limitations
+## Folder Structure
 
-- **Windows only** at runtime (development possible on macOS/Linux for tests).
-- **High VRAM** required for 7B models without quantization.
-- **English UI** recommended for Save-As keyboard flow.
-- **100% DPI scaling** strongly recommended; non-100% may cause coordinate drift.
-- **First run** downloads multi-GB models (requires internet).
-- Planner is Qwen2.5-VL (open-source) instead of paper's GPT-4o — documented deviation.
+```
+├── main.py                 # CLI entry
+├── vision/
+│   ├── gemini_grounding.py # Gemini API grounding (primary)
+│   └── gui_parser.py       # Coordinates + annotation
+├── automation/             # Mouse, keyboard, screenshots
+├── core/pipeline.py        # Full workflow
+└── config/                 # YAML settings
+```
+
+Legacy local-model files (`screenseeker.py`, `planner.py`, OS-Atlas in `grounding.py`) are kept for reference but **not used** by the default pipeline.
 
 ## Testing
 
-```bash
+```powershell
 uv run pytest tests/ -v
 ```
 
@@ -140,6 +123,9 @@ uv run pytest tests/ -v
 - [Design Document](docs/DESIGN.md)
 - [Interview Preparation](docs/INTERVIEW_PREP.md)
 
-## License
+## Known Limitations
 
-MIT (assignment project)
+- Requires internet and a valid Gemini API key
+- API usage may incur Google Cloud charges at scale
+- Windows-only at runtime for mouse/keyboard automation
+- 100% DPI scaling strongly recommended
