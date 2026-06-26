@@ -92,7 +92,7 @@ def main(argv: list[str] | None = None) -> int:
         result = service.locate(args.instruction, screenshot)
 
         logger.info("Bbox: %s", result.bbox.as_tuple())
-        logger.info("Center: %s", result.center)
+        logger.info("Click point: %s", result.click_point or result.center)
         logger.info("Confidence: %.2f", result.confidence)
         logger.info("Trace: %s", result.search_trace)
 

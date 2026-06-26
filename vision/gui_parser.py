@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from PIL import Image
 
-from utils.image import draw_bbox
+from utils.image import draw_bbox, draw_click_point
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +54,33 @@ class Bbox:
     @property
     def center(self) -> tuple[float, float]:
         return ((self.x1 + self.x2) / 2, (self.y1 + self.y2) / 2)
+
+    def click_point(self, *, vertical_bias: float = 0.35) -> tuple[float, float]:
+        """
+        Point to click inside the bbox.
+
+        Windows desktop icons stack graphic above label; bias toward the top
+        third hits the icon even when the bbox includes the label text.
+        """
+        cx = (self.x1 + self.x2) / 2
+        cy = self.y1 + (self.y2 - self.y1) * vertical_bias
+        return (cx, cy)
+
+    def expand(
+        self,
+        *,
+        pad_left: float = 0.0,
+        pad_right: float = 0.0,
+        pad_top: float = 0.0,
+        pad_bottom: float = 0.0,
+    ) -> Bbox:
+        """Return a padded bbox clamped to [0, 1]."""
+        return Bbox(
+            x1=self.x1 - pad_left,
+            y1=self.y1 - pad_top,
+            x2=self.x2 + pad_right,
+            y2=self.y2 + pad_bottom,
+        ).clamp()
 
     def area_px(self, width: int, height: int) -> float:
         return (self.x2 - self.x1) * width * (self.y2 - self.y1) * height
@@ -127,13 +154,17 @@ class GuiParser:
     def normalized_to_screen(
         self,
         point: tuple[float, float],
+        *,
+        image_width: int | None = None,
+        image_height: int | None = None,
         monitor_offset: tuple[int, int] = (0, 0),
-        dpi_scale: float = 1.0,
     ) -> tuple[int, int]:
-        """Convert normalized center to absolute screen pixel coordinates."""
+        """Convert normalized point to absolute screen pixels from a screenshot."""
         x_norm, y_norm = point
-        screen_x = int(x_norm * self.target_width * dpi_scale) + monitor_offset[0]
-        screen_y = int(y_norm * self.target_height * dpi_scale) + monitor_offset[1]
+        width = image_width or self.target_width
+        height = image_height or self.target_height
+        screen_x = int(x_norm * width) + monitor_offset[0]
+        screen_y = int(y_norm * height) + monitor_offset[1]
         return screen_x, screen_y
 
     def viewport_around_point(
@@ -160,9 +191,13 @@ class GuiParser:
         bbox: Bbox,
         *,
         label: str | None = None,
+        click_point: tuple[float, float] | None = None,
     ) -> Image.Image:
-        """Draw detection bbox on image."""
-        return draw_bbox(image, bbox.as_tuple(), label=label)
+        """Draw detection bbox and optional click target on image."""
+        annotated = draw_bbox(image, bbox.as_tuple(), label=label)
+        if click_point:
+            annotated = draw_click_point(annotated, click_point)
+        return annotated
 
     def patch_too_large(self, viewport: Viewport, img_w: int, img_h: int, min_size: int) -> bool:
         """Return True if viewport pixel dimensions exceed min patch size."""

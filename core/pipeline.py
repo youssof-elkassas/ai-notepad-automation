@@ -118,12 +118,23 @@ class NotepadPipeline:
             raise SystemExit(1) from exc
 
     def _to_screen_coords(self, result: GroundingResult) -> tuple[int, int]:
-        dpi = self._parser.get_dpi_scale()
-        return self._parser.normalized_to_screen(
-            result.center,
+        point = result.click_point or result.center
+        width, height = result.image_size
+        screen_x, screen_y = self._parser.normalized_to_screen(
+            point,
+            image_width=width,
+            image_height=height,
             monitor_offset=self.capture.monitor_offset,
-            dpi_scale=dpi,
         )
+        logger.info(
+            "Click point norm=%s → screen=(%d, %d) image=%dx%d",
+            point,
+            screen_x,
+            screen_y,
+            width,
+            height,
+        )
+        return screen_x, screen_y
 
     def _launch_notepad(self, screen_x: int, screen_y: int) -> None:
         """Act: double-click grounded icon and verify Notepad opens."""

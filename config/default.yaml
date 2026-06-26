@@ -6,10 +6,12 @@ screen:
   warn_on_dpi_mismatch: true
 
 grounding:
-  icon_instruction: "Notepad desktop icon"
+  icon_instruction: "Notepad desktop icon graphic (blue notepad symbol above the text label)"
   min_bbox_area_px: 400
   max_bbox_area_px: 20000
   require_planner_verdict: false
+  click_vertical_bias: 0.35
+  refine_grounding: true
 
 gemini:
   model: "gemini-2.5-flash"

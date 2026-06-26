@@ -30,6 +30,28 @@ def draw_bbox(
     return annotated
 
 
+def draw_click_point(
+    image: Image.Image,
+    point: tuple[float, float],
+    *,
+    color: str = "lime",
+    radius: int = 8,
+) -> Image.Image:
+    """Mark the normalized click target on a copy of the image."""
+    annotated = image.copy()
+    draw = ImageDraw.Draw(annotated)
+    w, h = annotated.size
+    cx, cy = int(point[0] * w), int(point[1] * h)
+    draw.ellipse(
+        [cx - radius, cy - radius, cx + radius, cy + radius],
+        outline=color,
+        width=3,
+    )
+    draw.line([cx - radius * 2, cy, cx + radius * 2, cy], fill=color, width=2)
+    draw.line([cx, cy - radius * 2, cx, cy + radius * 2], fill=color, width=2)
+    return annotated
+
+
 def bbox_center(bbox: tuple[float, float, float, float]) -> tuple[float, float]:
     """Return normalized center of a bbox."""
     x1, y1, x2, y2 = bbox

@@ -30,15 +30,33 @@ def test_local_global_roundtrip(parser):
 
 
 def test_normalized_to_screen(parser):
-    x, y = parser.normalized_to_screen((0.5, 0.5), monitor_offset=(0, 0), dpi_scale=1.0)
+    x, y = parser.normalized_to_screen(
+        (0.5, 0.5),
+        image_width=1920,
+        image_height=1080,
+        monitor_offset=(0, 0),
+    )
     assert x == 960
     assert y == 540
 
 
 def test_normalized_to_screen_with_offset(parser):
-    x, y = parser.normalized_to_screen((0.0, 0.0), monitor_offset=(100, 50), dpi_scale=1.0)
+    x, y = parser.normalized_to_screen(
+        (0.0, 0.0),
+        image_width=1920,
+        image_height=1080,
+        monitor_offset=(100, 50),
+    )
     assert x == 100
     assert y == 50
+
+
+def test_bbox_click_point_biased_upward():
+    bbox = Bbox(0.1, 0.2, 0.2, 0.4)
+    cx, cy = bbox.click_point(vertical_bias=0.35)
+    assert cx == pytest.approx(0.15)
+    assert cy == pytest.approx(0.27)
+    assert cy < bbox.center[1]
 
 
 def test_crop_viewport(parser):

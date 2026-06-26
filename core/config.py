@@ -20,10 +20,14 @@ class ScreenConfig(BaseModel):
 
 
 class GroundingConfig(BaseModel):
-    icon_instruction: str = "Notepad desktop icon"
+    icon_instruction: str = (
+        "Notepad desktop icon graphic (blue notepad symbol above the text label)"
+    )
     min_bbox_area_px: int = 400
     max_bbox_area_px: int = 20000
     require_planner_verdict: bool = True
+    click_vertical_bias: float = 0.35
+    refine_grounding: bool = True
 
 
 class ScreenSeekeRConfig(BaseModel):

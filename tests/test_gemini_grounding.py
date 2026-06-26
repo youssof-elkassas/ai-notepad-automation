@@ -33,6 +33,14 @@ def test_parse_invalid_json_raises():
         parse_gemini_grounding_json("not json")
 
 
+def test_repair_truncated_json_bbox():
+    raw = '{"found": true, "confidence": 0.8, "bbox_1000": [120, 340, 180, 420'
+    data = parse_gemini_grounding_json(raw)
+    bbox = bbox_from_gemini_payload(data)
+    assert data["found"] is True
+    assert bbox.x1 == pytest.approx(0.12)
+
+
 def test_mock_grounding_service():
     from PIL import Image
 

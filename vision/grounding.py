@@ -40,6 +40,8 @@ class GroundingResult:
     search_trace: list[str] = field(default_factory=list)
     annotated_image: Image.Image | None = None
     planner_verdict: str | None = None
+    click_point: tuple[float, float] | None = None
+    image_size: tuple[int, int] = (1920, 1080)
 
 
 def parse_os_atlas_bbox(raw: str, img_w: int, img_h: int) -> Bbox:
