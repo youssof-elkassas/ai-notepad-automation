@@ -6,7 +6,7 @@ screen:
   warn_on_dpi_mismatch: true
 
 grounding:
-  icon_instruction: "Notepad desktop icon graphic (blue notepad symbol above the text label)"
+  icon_instruction: "Notepad desktop icon"
   min_bbox_area_px: 400
   max_bbox_area_px: 20000
   require_planner_verdict: false

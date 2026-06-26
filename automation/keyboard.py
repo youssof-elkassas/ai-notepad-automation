@@ -74,6 +74,12 @@ class KeyboardController:
             raise SaveError(f"Saved file is empty: {filepath}")
         logger.info("File saved successfully: %s", filepath)
 
+    def show_desktop(self) -> None:
+        """Show Windows desktop (Win+D) before grounding or clicking icons."""
+        logger.debug("Showing desktop (Win+D)")
+        self.hotkey(Key.cmd, "d")
+        time.sleep(0.5)
+
     def close_active_window(self) -> None:
         """Close active window with Alt+F4."""
         self.hotkey(Key.alt, Key.f4)
