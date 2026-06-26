@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 
 from core.exceptions import ConfigurationError
+from core.env import load_project_dotenv
 
 
 class ScreenConfig(BaseModel):
@@ -75,6 +76,7 @@ class AutomationConfig(BaseModel):
 
 class GeminiConfig(BaseModel):
     model: str = "gemini-2.0-flash"
+    api_key: str = ""  # optional; prefer .env or config/secrets.yaml
     api_key_env: str = "GEMINI_API_KEY"
     temperature: float = 0.1
     max_output_tokens: int = 512
@@ -130,10 +132,18 @@ def load_config(
     config_dir: Path | None = None,
 ) -> AppConfig:
     """Load default config merged with the selected hardware profile."""
+    load_project_dotenv()
+
     root = config_dir or Path(__file__).resolve().parent.parent / "config"
     default_data = _load_yaml(root / "default.yaml")
     profile_path = root / f"profile_{profile}.yaml"
     profile_data = _load_yaml(profile_path)
     merged = _deep_merge(default_data, profile_data)
+
+    secrets_path = root / "secrets.yaml"
+    if secrets_path.exists():
+        secrets_data = _load_yaml(secrets_path)
+        merged = _deep_merge(merged, secrets_data)
+
     merged["profile"] = profile
     return AppConfig(**merged)

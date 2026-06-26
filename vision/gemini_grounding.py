@@ -12,6 +12,7 @@ from typing import Any
 from PIL import Image
 
 from core.config import AppConfig
+from core.env import get_gemini_api_key
 from core.exceptions import BboxParseError, ConfigurationError, GroundingError, LowConfidenceError
 from vision.grounding import GroundingResult, MockGrounder, compute_confidence
 from vision.gui_parser import Bbox, GuiParser
@@ -85,12 +86,21 @@ class GeminiGrounder:
         self._client = None
 
     def _api_key(self) -> str:
-        env_name = self.config.gemini.api_key_env
-        key = os.environ.get(env_name, "").strip()
+        key = get_gemini_api_key(
+            config_key=self.config.gemini.api_key,
+            env_var=self.config.gemini.api_key_env,
+        )
         if not key:
+            from core.env import project_root
+
+            root = project_root()
             raise ConfigurationError(
-                f"Gemini API key not set. Export {env_name}=your_key "
-                f"(get one at https://aistudio.google.com/apikey)"
+                "Gemini API key not found. Use ONE of these:\n"
+                f"  1) Create {root / '.env'} with: GEMINI_API_KEY=your_key\n"
+                f"  2) Create config/secrets.yaml (copy secrets.yaml.example)\n"
+                f"  3) set {self.config.gemini.api_key_env}=your_key in the terminal\n"
+                "Get a key: https://aistudio.google.com/apikey\n"
+                "Windows tip: file must be named `.env` not `.env.txt`"
             )
         return key
 

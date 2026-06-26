@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from core.config import load_config
+from core.env import load_project_dotenv
 from core.logger import setup_logger
 from core.pipeline import NotepadPipeline
 from vision.gemini_grounding import create_grounding_service
@@ -62,6 +63,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    load_project_dotenv()
     parser = build_parser()
     args = parser.parse_args(argv)
     profile = getattr(args, "profile", "high")
