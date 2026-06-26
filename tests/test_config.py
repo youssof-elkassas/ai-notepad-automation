@@ -12,5 +12,5 @@ def test_load_high_profile():
 def test_load_low_profile():
     config = load_config("low")
     assert config.profile == "low"
-    assert config.gemini.model == "gemini-2.0-flash-lite"
+    assert config.gemini.model == "gemini-2.0-flash"
     assert config.gemini.min_confidence == 0.4

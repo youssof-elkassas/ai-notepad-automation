@@ -9,6 +9,10 @@ class GroundingError(AutomationError):
     """Raised when visual grounding fails."""
 
 
+class GeminiQuotaError(GroundingError):
+    """Raised when Gemini API quota or rate limit is exceeded."""
+
+
 class LowConfidenceError(GroundingError):
     """Raised when grounding confidence is below threshold."""
 

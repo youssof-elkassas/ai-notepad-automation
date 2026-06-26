@@ -81,6 +81,11 @@ class GeminiConfig(BaseModel):
     temperature: float = 0.1
     max_output_tokens: int = 512
     min_confidence: float = 0.5
+    max_image_width: int = 1280  # shrink screenshot before API to save quota/tokens
+    fallback_models: list[str] = Field(
+        default_factory=lambda: ["gemini-1.5-flash", "gemini-2.0-flash"]
+    )
+    rate_limit_wait_seconds: float = 45.0
 
 
 class ModelsConfig(BaseModel):

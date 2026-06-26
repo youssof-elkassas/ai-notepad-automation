@@ -17,6 +17,10 @@ gemini:
   temperature: 0.1
   max_output_tokens: 512
   min_confidence: 0.5
+  max_image_width: 1280
+  fallback_models:
+    - "gemini-1.5-flash"
+  rate_limit_wait_seconds: 45
 
 screenseeker:
   max_depth: 3

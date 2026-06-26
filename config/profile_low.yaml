@@ -1,8 +1,10 @@
 profile: low
 
 gemini:
-  model: "gemini-2.0-flash-lite"
+  model: "gemini-2.0-flash"
   min_confidence: 0.4
+  fallback_models:
+    - "gemini-1.5-flash"
 
 timeouts:
   grounding_seconds: 90
