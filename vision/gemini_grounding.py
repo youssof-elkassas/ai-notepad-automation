@@ -86,20 +86,43 @@ def _repair_truncated_json(text: str) -> dict[str, Any] | None:
     }
 
 
+def _response_text(response) -> str:
+    """Collect full text from a GenerateContentResponse."""
+    text = getattr(response, "text", None) or ""
+    if text.strip():
+        return text
+
+    chunks: list[str] = []
+    for candidate in getattr(response, "candidates", None) or []:
+        content = getattr(candidate, "content", None)
+        if not content:
+            continue
+        for part in getattr(content, "parts", None) or []:
+            part_text = getattr(part, "text", None)
+            if part_text:
+                chunks.append(part_text)
+    return "".join(chunks)
+
+
 def parse_grounding_response(response) -> dict[str, Any]:
     """Extract grounding dict from a google-genai GenerateContentResponse."""
     parsed = getattr(response, "parsed", None)
-    if isinstance(parsed, dict):
+    if isinstance(parsed, dict) and _payload_has_bbox(parsed):
         return parsed
-    if parsed is not None:
-        return dict(parsed)
-    text = getattr(response, "text", None) or ""
+    if parsed is not None and hasattr(parsed, "model_dump"):
+        data = parsed.model_dump()
+        if isinstance(data, dict) and _payload_has_bbox(data):
+            return data
+
+    text = _response_text(response)
     if not text.strip():
         raise GroundingError("GenAI returned an empty response")
-    try:
-        return parse_gemini_grounding_json(text)
-    except json.JSONDecodeError as exc:
-        raise BboxParseError(f"Gemini returned invalid JSON: {text[:300]}") from exc
+    return parse_gemini_grounding_json(text)
+
+
+def _payload_has_bbox(data: dict[str, Any]) -> bool:
+    coords = data.get("bbox_1000") or data.get("bbox")
+    return isinstance(coords, list) and len(coords) == 4
 
 
 def bbox_from_gemini_payload(data: dict[str, Any]) -> Bbox:
@@ -190,7 +213,10 @@ class GeminiGrounder:
                 )
                 return bbox, raw, confidence, found, model
 
-            except BboxParseError:
+            except BboxParseError as exc:
+                logger.warning("GenAI JSON parse failed on %s: %s", model, exc)
+                if model != models[-1]:
+                    continue
                 raise
             except Exception as exc:
                 if _is_rate_limit_error(exc):
@@ -221,15 +247,20 @@ class GeminiGrounder:
         instruction: str,
         rough_bbox: Bbox,
     ) -> tuple[Bbox, str, float, bool]:
-        """Re-ground inside an expanded crop for tighter icon localization."""
-        viewport = refinement_viewport(rough_bbox)
-        crop = self._parser.crop_viewport(image, viewport)
-        prompt = GEMINI_REFINE_PROMPT.format(instruction=instruction)
-        local_bbox, raw, confidence, found, _model = self._generate_grounding(crop, prompt)
-        if not found:
-            return rough_bbox, raw, confidence, False
-        global_bbox = self._parser.local_to_global(local_bbox, viewport)
-        return global_bbox, raw, confidence, True
+        """Re-ground inside an expanded crop; fall back to rough_bbox on failure."""
+        try:
+            viewport = refinement_viewport(rough_bbox)
+            crop = self._parser.crop_viewport(image, viewport)
+            prompt = GEMINI_REFINE_PROMPT.format(instruction=instruction)
+            local_bbox, raw, confidence, found, _model = self._generate_grounding(crop, prompt)
+            if not found:
+                logger.warning("Refinement: element not found in crop; keeping initial bbox")
+                return rough_bbox, raw, confidence, False
+            global_bbox = self._parser.local_to_global(local_bbox, viewport)
+            return global_bbox, raw, confidence, True
+        except (BboxParseError, GroundingError) as exc:
+            logger.warning("Refinement failed (%s); keeping initial bbox", exc)
+            return rough_bbox, "", 0.0, False
 
 
 class GeminiGroundingService:

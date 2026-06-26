@@ -3,7 +3,11 @@
 import pytest
 
 from core.exceptions import BboxParseError
-from vision.gemini_grounding import bbox_from_gemini_payload, parse_gemini_grounding_json
+from vision.gemini_grounding import (
+    bbox_from_gemini_payload,
+    parse_gemini_grounding_json,
+    parse_grounding_response,
+)
 
 
 def test_parse_gemini_json_clean():
@@ -39,6 +43,38 @@ def test_repair_truncated_json_bbox():
     bbox = bbox_from_gemini_payload(data)
     assert data["found"] is True
     assert bbox.x1 == pytest.approx(0.12)
+
+
+def test_parse_grounding_response_ignores_incomplete_parsed():
+    class FakeResponse:
+        parsed = {"found": True}
+        text = '{"found": true, "confidence": 0.9, "bbox_1000": [100, 200, 150, 280]}'
+
+    data = parse_grounding_response(FakeResponse())
+    assert data["bbox_1000"] == [100, 200, 150, 280]
+
+
+def test_refine_falls_back_on_parse_error():
+    from unittest.mock import MagicMock, patch
+
+    from core.config import load_config
+    from vision.gemini_grounding import GeminiGrounder
+    from vision.gui_parser import Bbox
+
+    config = load_config("low")
+    grounder = GeminiGrounder(config)
+    rough = Bbox(0.1, 0.2, 0.15, 0.3)
+    image = __import__("PIL").Image.new("RGB", (1920, 1080))
+
+    with patch.object(
+        grounder,
+        "_generate_grounding",
+        side_effect=BboxParseError("truncated"),
+    ):
+        bbox, _raw, _conf, found = grounder.refine(image, "Notepad icon", rough)
+
+    assert found is False
+    assert bbox == rough
 
 
 def test_mock_grounding_service():

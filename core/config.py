@@ -83,7 +83,7 @@ class GeminiConfig(BaseModel):
     api_key: str = ""  # optional; prefer .env or config/secrets.yaml
     api_key_env: str = "GOOGLE_API_KEY"
     temperature: float = 0.1
-    max_output_tokens: int = 512
+    max_output_tokens: int = 1024
     min_confidence: float = 0.5
     max_image_width: int = 1280  # shrink screenshot before API to save quota/tokens
     fallback_models: list[str] = Field(
