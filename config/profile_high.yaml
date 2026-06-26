@@ -1,0 +1,14 @@
+profile: high
+
+models:
+  grounder_id: "OS-Copilot/OS-Atlas-Base-7B"
+  planner_id: "Qwen/Qwen2.5-VL-7B-Instruct"
+  load_in_4bit: false
+  device: "cuda"
+
+screenseeker:
+  max_depth: 3
+  use_regound_fallback: false
+
+timeouts:
+  grounding_seconds: 120

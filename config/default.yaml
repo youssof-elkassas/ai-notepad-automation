@@ -1,0 +1,53 @@
+# Shared defaults — overridden by profile_high.yaml / profile_low.yaml
+
+screen:
+  width: 1920
+  height: 1080
+  warn_on_dpi_mismatch: true
+
+grounding:
+  icon_instruction: "Notepad desktop icon"
+  min_bbox_area_px: 400
+  max_bbox_area_px: 20000
+  require_planner_verdict: true
+
+screenseeker:
+  max_depth: 3
+  min_patch_size_px: 1280
+  sigma: 0.3
+  nms_iou_threshold: 0.5
+  max_candidates: 5
+  reground_crop_size: 1024
+  use_regound_fallback: false
+
+retry:
+  screenshot_max_attempts: 3
+  grounding_max_attempts: 3
+  click_verify_max_attempts: 2
+  backoff_base_seconds: 1.0
+  backoff_jitter_seconds: 0.5
+
+timeouts:
+  grounding_seconds: 120
+  window_wait_seconds: 15
+  save_dialog_seconds: 10
+  notepad_launch_seconds: 15
+
+paths:
+  project_folder: "tjm-project"
+  screenshots_dir: "screenshots"
+  failures_dir: "screenshots/failures"
+  annotated_dir: "screenshots/annotated"
+  models_dir: "models"
+
+api:
+  posts_url: "https://jsonplaceholder.typicode.com/posts"
+  posts_limit: 10
+
+logging:
+  level: "INFO"
+  log_file: "screenshots/automation.log"
+
+automation:
+  mouse_fail_safe: false
+  typing_interval_seconds: 0.02

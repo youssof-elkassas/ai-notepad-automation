@@ -1,0 +1,15 @@
+profile: low
+
+models:
+  grounder_id: "OS-Copilot/OS-Atlas-Base-4B"
+  planner_id: "Qwen/Qwen2.5-VL-3B-Instruct"
+  load_in_4bit: true
+  device: "cuda"
+
+screenseeker:
+  max_depth: 2
+  max_candidates: 3
+  use_regound_fallback: true
+
+timeouts:
+  grounding_seconds: 180

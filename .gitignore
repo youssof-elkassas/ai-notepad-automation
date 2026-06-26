@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+uv.lock.bak
+models/*
+!models/.gitkeep
+screenshots/*
+!screenshots/.gitkeep
+*.log
+.DS_Store
+.env

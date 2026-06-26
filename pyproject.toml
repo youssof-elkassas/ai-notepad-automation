@@ -1,0 +1,55 @@
+[project]
+name = "ai-notepad-automation"
+version = "0.1.0"
+description = "ScreenSeekeR-based Windows GUI grounding automation for Notepad workflow"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "pyyaml>=6.0",
+    "httpx>=0.27",
+    "pillow>=10.0",
+    "mss>=9.0",
+    "pynput>=1.7",
+    "pywinauto>=0.6.8",
+    "pygetwindow>=0.0.9",
+]
+
+[project.optional-dependencies]
+vision = [
+    "torch>=2.1",
+    "transformers>=4.45",
+    "accelerate>=0.34",
+    "qwen-vl-utils>=0.0.8",
+    "bitsandbytes>=0.43; sys_platform == 'win32'",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-mock>=3.12",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+notepad-automation = "main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = [
+    "vision",
+    "automation",
+    "api",
+    "core",
+    "utils",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
