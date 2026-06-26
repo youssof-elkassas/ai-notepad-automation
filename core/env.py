@@ -57,13 +57,14 @@ def get_gemini_api_key(
     config_key: str = "",
     env_var: str = "GEMINI_API_KEY",
 ) -> str:
-    """Resolve Gemini API key from config, .env, or environment."""
+    """Resolve API key — matches google-genai SDK env var precedence."""
     load_project_dotenv()
 
     if config_key.strip():
         return _strip_quotes(config_key.strip())
 
-    for name in (env_var, "GEMINI_API_KEY", "GOOGLE_API_KEY"):
+    # google-genai Client checks GOOGLE_API_KEY first, then GEMINI_API_KEY
+    for name in ("GOOGLE_API_KEY", "GEMINI_API_KEY", env_var):
         value = os.environ.get(name, "").strip()
         if value:
             return _strip_quotes(value)

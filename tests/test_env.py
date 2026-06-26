@@ -18,6 +18,9 @@ def test_get_gemini_api_key_from_config():
 
 
 def test_load_project_dotenv_missing(monkeypatch, tmp_path):
+    import core.env as env_module
+
+    monkeypatch.setattr(env_module, "_PROJECT_ROOT", tmp_path)
     monkeypatch.chdir(tmp_path)
     assert load_project_dotenv() is None
 

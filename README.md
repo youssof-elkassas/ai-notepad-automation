@@ -34,8 +34,8 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 # Install dependencies
 uv sync --extra dev
 
-# Set your API key
-set GEMINI_API_KEY=your_key_here
+# Set your API key (google-genai SDK accepts either name)
+set GOOGLE_API_KEY=your_key_here
 ```
 
 Or copy `.env.example` to `.env` and fill in your key (load manually or use `set` in the shell).
@@ -51,7 +51,7 @@ uv run python main.py setup
 ### Demo grounding (single screenshot — best first test)
 
 ```powershell
-set GEMINI_API_KEY=your_key_here
+set GOOGLE_API_KEY=your_key_here
 uv run python main.py demo --profile high
 ```
 
@@ -96,14 +96,15 @@ Configure in `config/profile_high.yaml` and `config/profile_low.yaml`.
 Key settings:
 - `grounding.icon_instruction` — what to find on screen
 - `gemini.min_confidence` — reject low-confidence detections
-- `gemini.api_key_env` — env var name for API key (default: `GEMINI_API_KEY`)
+- `gemini.api_key_env` — env var name for API key (default: `GOOGLE_API_KEY`)
 
 ## Folder Structure
 
 ```
 ├── main.py                 # CLI entry
 ├── vision/
-│   ├── gemini_grounding.py # Gemini API grounding (primary)
+│   ├── genai_client.py     # google-genai SDK client factory
+│   ├── gemini_grounding.py # Structured grounding via GenAI
 │   └── gui_parser.py       # Coordinates + annotation
 ├── automation/             # Mouse, keyboard, screenshots
 ├── core/pipeline.py        # Full workflow
