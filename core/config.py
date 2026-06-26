@@ -75,7 +75,7 @@ class AutomationConfig(BaseModel):
 
 
 class GeminiConfig(BaseModel):
-    model: str = "gemini-2.0-flash"
+    model: str = "gemini-2.5-flash"
     api_key: str = ""  # optional; prefer .env or config/secrets.yaml
     api_key_env: str = "GOOGLE_API_KEY"
     temperature: float = 0.1

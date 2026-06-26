@@ -80,8 +80,8 @@ uv run python main.py run --mock
 
 | Profile | Gemini model | Use case |
 |---------|--------------|----------|
-| `high` | `gemini-2.0-flash` | Best accuracy (default) |
-| `low` | `gemini-2.0-flash-lite` | Faster / cheaper |
+| `high` | `gemini-2.5-flash` | Best accuracy (default) |
+| `low` | `gemini-2.5-flash` | Same model, lower confidence threshold |
 
 Configure in `config/profile_high.yaml` and `config/profile_low.yaml`.
 
