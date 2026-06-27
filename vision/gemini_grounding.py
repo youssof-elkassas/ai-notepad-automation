@@ -12,7 +12,11 @@ from PIL import Image
 
 from core.config import AppConfig
 from core.exceptions import BboxParseError, GeminiQuotaError, GroundingError, LowConfidenceError
-from vision.genai_client import build_grounding_config, create_genai_client
+from vision.genai_client import (
+    build_grounding_config,
+    build_verify_config,
+    create_genai_client,
+)
 from vision.grounding import GroundingResult, MockGrounder, compute_confidence
 from vision.gui_parser import Bbox, GuiParser, Viewport
 
@@ -44,6 +48,16 @@ Find the application icon GRAPHIC (colored symbol only) matching:
 Return JSON with bbox_1000 tightly around the square icon image.
 Do NOT include the text label under the icon.
 Coordinates are relative to this cropped image (0-1000 scale).
+"""
+
+GEMINI_VERIFY_PROMPT = """This image is a crop from a Windows desktop centered on a previous click point.
+
+Does the following UI element appear at or very near the center of this crop?
+"{instruction}"
+
+Return JSON with:
+- found: true if the element is clearly visible near the center
+- confidence: 0.0 to 1.0
 """
 
 
@@ -120,6 +134,27 @@ def parse_grounding_response(response) -> dict[str, Any]:
     return parse_gemini_grounding_json(text)
 
 
+def parse_verify_response(response) -> tuple[bool, float]:
+    """Parse a yes/no verification response."""
+    parsed = getattr(response, "parsed", None)
+    if isinstance(parsed, dict):
+        data = parsed
+    elif parsed is not None and hasattr(parsed, "model_dump"):
+        data = parsed.model_dump()
+    else:
+        text = _response_text(response)
+        if not text.strip():
+            return False, 0.0
+        try:
+            data = parse_gemini_grounding_json(text)
+        except BboxParseError:
+            return False, 0.0
+
+    found = bool(data.get("found", False))
+    confidence = float(data.get("confidence", 0.0))
+    return found, confidence
+
+
 def _payload_has_bbox(data: dict[str, Any]) -> bool:
     coords = data.get("bbox_1000") or data.get("bbox")
     return isinstance(coords, list) and len(coords) == 4
@@ -181,13 +216,16 @@ class GeminiGrounder:
                 models.append(m)
         return models
 
-    def _generate_grounding(
+    def _generate_with_config(
         self,
         image: Image.Image,
         prompt: str,
-    ) -> tuple[Bbox, str, float, bool, str]:
+        gen_config,
+        *,
+        verify: bool = False,
+    ) -> tuple[dict[str, Any], str, str]:
+        """Call GenAI and return (payload dict, raw json, model name)."""
         api_image = self._prepare_api_image(image)
-        gen_config = build_grounding_config(self.config)
         models = self._models_to_try()
         last_quota_error: Exception | None = None
 
@@ -199,19 +237,13 @@ class GeminiGrounder:
                     contents=[api_image, prompt],
                     config=gen_config,
                 )
-                data = parse_grounding_response(response)
+                if verify:
+                    found, confidence = parse_verify_response(response)
+                    data = {"found": found, "confidence": confidence}
+                else:
+                    data = parse_grounding_response(response)
                 raw = json.dumps(data)
-                found = bool(data.get("found", False))
-                confidence = float(data.get("confidence", 0.0))
-                bbox = bbox_from_gemini_payload(data) if found else Bbox(0, 0, 0, 0)
-                logger.info(
-                    "GenAI result (%s): found=%s confidence=%.2f bbox=%s",
-                    model,
-                    found,
-                    confidence,
-                    bbox.as_tuple(),
-                )
-                return bbox, raw, confidence, found, model
+                return data, raw, model
 
             except BboxParseError as exc:
                 logger.warning("GenAI JSON parse failed on %s: %s", model, exc)
@@ -234,6 +266,60 @@ class GeminiGrounder:
         if last_quota_error:
             raise _quota_error_message(last_quota_error) from last_quota_error
         raise GroundingError("GenAI grounding failed for all configured models")
+
+    def _generate_grounding(
+        self,
+        image: Image.Image,
+        prompt: str,
+    ) -> tuple[Bbox, str, float, bool, str]:
+        gen_config = build_grounding_config(self.config)
+        data, raw, model = self._generate_with_config(image, prompt, gen_config)
+        found = bool(data.get("found", False))
+        confidence = float(data.get("confidence", 0.0))
+        bbox = bbox_from_gemini_payload(data) if found else Bbox(0, 0, 0, 0)
+        logger.info(
+            "GenAI result (%s): found=%s confidence=%.2f bbox=%s",
+            model,
+            found,
+            confidence,
+            bbox.as_tuple(),
+        )
+        return bbox, raw, confidence, found, model
+
+    def verify_at_point(
+        self,
+        image: Image.Image,
+        instruction: str,
+        click_point: tuple[float, float],
+    ) -> tuple[bool, float]:
+        """Check whether *instruction* is still visible near *click_point*."""
+        crop_px = self.config.grounding.cache_verify_crop_px
+        viewport = self._parser.viewport_around_point(
+            click_point,
+            crop_px,
+            image.width,
+            image.height,
+        )
+        crop = self._parser.crop_viewport(image, viewport)
+        prompt = GEMINI_VERIFY_PROMPT.format(instruction=instruction)
+        gen_config = build_verify_config(self.config)
+        try:
+            data, _raw, model = self._generate_with_config(
+                crop, prompt, gen_config, verify=True
+            )
+            found = bool(data.get("found", False))
+            confidence = float(data.get("confidence", 0.0))
+            logger.info(
+                "GenAI verify (%s): found=%s confidence=%.2f point=%s",
+                model,
+                found,
+                confidence,
+                click_point,
+            )
+            return found, confidence
+        except (BboxParseError, GroundingError) as exc:
+            logger.warning("Cache verification failed: %s", exc)
+            return False, 0.0
 
     def ground(self, image: Image.Image, instruction: str) -> tuple[Bbox, str, float, bool]:
         """Call GenAI and return (bbox, raw_text, confidence, found)."""
@@ -342,6 +428,27 @@ class GeminiGroundingService:
             image_size=(image.width, image.height),
         )
 
+    def verify_cached(
+        self,
+        instruction: str,
+        screenshot: Image.Image,
+        cached: GroundingResult,
+    ) -> bool:
+        """Return True if cached click point still targets the instruction."""
+        image = self._parser.normalize_screenshot(screenshot)
+        point = cached.click_point or cached.center
+        found, confidence = self._grounder.verify_at_point(image, instruction, point)
+        valid = found and confidence >= self.config.gemini.min_confidence
+        if valid:
+            logger.info("Cached coordinates verified (confidence=%.2f)", confidence)
+        else:
+            logger.info(
+                "Cached coordinates rejected (found=%s confidence=%.2f)",
+                found,
+                confidence,
+            )
+        return valid
+
 
 class MockGroundingService:
     """Offline grounding for tests using deterministic bbox."""
@@ -376,6 +483,14 @@ class MockGroundingService:
             click_point=click_point,
             image_size=(image.width, image.height),
         )
+
+    def verify_cached(
+        self,
+        instruction: str,
+        screenshot: Image.Image,
+        cached: GroundingResult,
+    ) -> bool:
+        return cached.click_point is not None
 
 
 def create_grounding_service(

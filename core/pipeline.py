@@ -14,9 +14,9 @@ from automation.windows import WindowsCapture
 from core.config import AppConfig
 from core.exceptions import GroundingError, LowConfidenceError, VerificationError
 from core.grounding_workflow import (
-    locate_on_screenshot,
     log_grounding_result,
     resolve_grounding_instruction,
+    resolve_grounding_with_cache,
     save_grounding_debug,
     to_screen_coords,
 )
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 class NotepadPipeline:
-    """Full automation pipeline with per-iteration re-grounding via Gemini."""
+    """Full automation pipeline with cached icon coordinates after first grounding."""
 
     def __init__(
         self,
@@ -43,6 +43,7 @@ class NotepadPipeline:
         self.keyboard = KeyboardController(config)
         self.grounding = create_grounding_service(config, use_mock=use_mock)
         self._instruction = resolve_grounding_instruction(config)
+        self._cached_grounding: GroundingResult | None = None
 
     def run(self, posts: list[Post] | None = None) -> None:
         """Execute the full Notepad workflow for all posts."""
@@ -55,6 +56,8 @@ class NotepadPipeline:
 
         logger.info("Starting pipeline for %d posts → %s", len(posts), output_dir)
         logger.info("Grounding instruction: %s", self._instruction)
+        if self.config.grounding.cache_coordinates:
+            logger.info("Coordinate caching enabled (ground once, verify thereafter)")
 
         for post in posts:
             self._process_post(post, output_dir)
@@ -62,7 +65,7 @@ class NotepadPipeline:
         logger.info("Pipeline completed successfully")
 
     def _process_post(self, post: Post, output_dir: Path) -> None:
-        """Process a single post with fresh screenshot and grounding."""
+        """Process a single post with cached or fresh grounding."""
         logger.info("=== Processing post %d ===", post.id)
 
         result = self._open_notepad_via_grounding(post.id)
@@ -76,16 +79,19 @@ class NotepadPipeline:
         logger.info("Post %d saved to %s", post.id, outfile)
 
     def _open_notepad_via_grounding(self, post_id: int) -> GroundingResult:
-        """
-        Same flow as demo: show desktop → screenshot → ground → click → verify.
-
-        Re-grounds on each retry so click always uses fresh coordinates.
-        """
+        """Show desktop, ground (or verify cache), click, and open Notepad."""
 
         def _attempt() -> GroundingResult:
             self.keyboard.show_desktop()
             time.sleep(0.3)
-            result = locate_on_screenshot(self.capture, self.grounding, self._instruction)
+            screenshot = self.capture.capture_screenshot()
+            result, self._cached_grounding = resolve_grounding_with_cache(
+                self.grounding,
+                self._instruction,
+                screenshot,
+                self.config,
+                self._cached_grounding,
+            )
             log_grounding_result(result)
             save_grounding_debug(result, self.config, f"post_{post_id}_grounding")
 
@@ -100,6 +106,7 @@ class NotepadPipeline:
 
         def on_retry(attempt: int, exc: Exception) -> None:
             logger.warning("Open Notepad attempt %d failed: %s", attempt, exc)
+            self._cached_grounding = None
             try:
                 img = self.capture.capture_screenshot()
                 save_failure_screenshot(
@@ -125,6 +132,7 @@ class NotepadPipeline:
                 on_retry=on_retry,
             )
         except (GroundingError, LowConfidenceError, VerificationError) as exc:
+            self._cached_grounding = None
             try:
                 img = self.capture.capture_screenshot()
                 reason = getattr(exc, "reason", str(exc))

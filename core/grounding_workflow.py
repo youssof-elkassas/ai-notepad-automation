@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from pathlib import Path
+
+from PIL import Image
 
 from automation.windows import WindowsCapture
 from core.config import AppConfig
@@ -28,11 +31,61 @@ def locate_on_screenshot(
     capture: WindowsCapture,
     service: GeminiGroundingService | MockGroundingService,
     instruction: str,
+    screenshot: Image.Image | None = None,
 ) -> GroundingResult:
-    """Capture a screenshot and ground the target — same path as demo."""
-    screenshot = capture.capture_screenshot()
+    """Capture a screenshot (if needed) and ground the target."""
+    if screenshot is None:
+        screenshot = capture.capture_screenshot()
     logger.info("Grounding instruction: %s", instruction)
     return service.locate(instruction, screenshot)
+
+
+def refresh_from_cache(
+    cached: GroundingResult,
+    screenshot: Image.Image,
+    config: AppConfig,
+    instruction: str,
+) -> GroundingResult:
+    """Rebuild a grounding result from cache using the current screenshot."""
+    parser = GuiParser(config.screen.width, config.screen.height)
+    image = parser.normalize_screenshot(screenshot)
+    click_point = cached.click_point or cached.center
+    return replace(
+        cached,
+        confidence=cached.confidence,
+        search_trace=[*cached.search_trace, "cache:hit"],
+        annotated_image=parser.annotate(
+            image,
+            cached.bbox,
+            label=f"{instruction} (cached)",
+            click_point=click_point,
+        ),
+        image_size=(image.width, image.height),
+    )
+
+
+def resolve_grounding_with_cache(
+    service: GeminiGroundingService | MockGroundingService,
+    instruction: str,
+    screenshot: Image.Image,
+    config: AppConfig,
+    cached: GroundingResult | None,
+) -> tuple[GroundingResult, GroundingResult]:
+    """
+    Ground once, then verify cache on later calls.
+
+    Returns (result_for_this_call, cache_to_store).
+    """
+    if cached is not None and config.grounding.cache_coordinates:
+        if service.verify_cached(instruction, screenshot, cached):
+            logger.info("Using cached Notepad coordinates (skipping full grounding)")
+            result = refresh_from_cache(cached, screenshot, config, instruction)
+            return result, cached
+
+        logger.info("Cached coordinates invalid — running full grounding")
+
+    result = service.locate(instruction, screenshot)
+    return result, result
 
 
 def to_screen_coords(
