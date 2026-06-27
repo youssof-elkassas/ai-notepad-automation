@@ -12,8 +12,6 @@ grounding:
   require_planner_verdict: false
   click_vertical_bias: 0.35
   refine_grounding: true
-  cache_coordinates: true
-  cache_verify_crop_px: 256
 
 gemini:
   model: "gemini-2.5-flash"

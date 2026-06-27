@@ -32,15 +32,6 @@ GROUNDING_JSON_SCHEMA: dict = {
     "required": ["found", "confidence", "bbox_1000"],
 }
 
-VERIFY_JSON_SCHEMA: dict = {
-    "type": "object",
-    "properties": {
-        "found": {"type": "boolean"},
-        "confidence": {"type": "number"},
-    },
-    "required": ["found", "confidence"],
-}
-
 
 def resolve_api_key(config: AppConfig) -> str:
     """Resolve API key from config file, .env, or environment."""
@@ -98,14 +89,4 @@ def build_grounding_config(config: AppConfig) -> types.GenerateContentConfig:
         max_output_tokens=config.gemini.max_output_tokens,
         response_mime_type="application/json",
         response_json_schema=GROUNDING_JSON_SCHEMA,
-    )
-
-
-def build_verify_config(config: AppConfig) -> types.GenerateContentConfig:
-    """Build GenerateContentConfig for cached-coordinate verification."""
-    return types.GenerateContentConfig(
-        temperature=config.gemini.temperature,
-        max_output_tokens=256,
-        response_mime_type="application/json",
-        response_json_schema=VERIFY_JSON_SCHEMA,
     )

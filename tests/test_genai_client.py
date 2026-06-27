@@ -4,12 +4,7 @@ import pytest
 
 from core.config import load_config
 from core.env import get_gemini_api_key
-from vision.genai_client import (
-    GROUNDING_JSON_SCHEMA,
-    build_grounding_config,
-    build_verify_config,
-    resolve_api_key,
-)
+from vision.genai_client import GROUNDING_JSON_SCHEMA, build_grounding_config, resolve_api_key
 
 
 def test_grounding_json_schema_has_required_fields():
@@ -22,13 +17,6 @@ def test_build_grounding_config():
     gen_config = build_grounding_config(config)
     assert gen_config.response_mime_type == "application/json"
     assert gen_config.response_json_schema == GROUNDING_JSON_SCHEMA
-
-
-def test_build_verify_config():
-    config = load_config("high")
-    gen_config = build_verify_config(config)
-    assert gen_config.response_mime_type == "application/json"
-    assert "bbox_1000" not in gen_config.response_json_schema["properties"]
 
 
 def test_get_gemini_api_key_prefers_google(monkeypatch):

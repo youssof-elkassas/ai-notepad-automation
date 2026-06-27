@@ -26,8 +26,6 @@ class GroundingConfig(BaseModel):
     require_planner_verdict: bool = True
     click_vertical_bias: float = 0.35
     refine_grounding: bool = True
-    cache_coordinates: bool = True
-    cache_verify_crop_px: int = 256
 
 
 class ScreenSeekeRConfig(BaseModel):
